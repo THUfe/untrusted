@@ -152,6 +152,23 @@ function isNewerVersion(v1, v2) {
     }
     return (0 > cmp);
 }
+function playIntro(display, map, i) {
+	if (i < 0) {
+        display._intro = true;
+    } else {
+        if (typeof i === 'undefined') { i = map.getHeight(); }
+        display.clear();
+        display.drawText(0, i - 2, "%c{#0f0}> initialize");
+        display.drawText(15, i + 3, "U N T R U S T E D");
+        display.drawText(20, i + 5, "- or - ");
+        display.drawText(5, i + 7, "THE CONTINUING ADVENTURES OF DR. EVAL");
+        display.drawText(3, i + 12, "a game by Alex Nisnevich and Greg Shuflin");
+        display.drawText(10, i + 22, "Press any key to begin ...");
+        setTimeout(function () {
+            display.playIntro(map, i - 1);
+        }, 100);
+    }
+}
 (function () {
 function Game(debugMode, startLevel) {
     /* private properties */
@@ -168,35 +185,14 @@ function Game(debugMode, startLevel) {
     };
 
     this._levelFileNames = [
-        '01_cellBlockA.jsx',
-        '02_theLongWayOut.jsx',
-        '03_validationEngaged.jsx',
-        '04_multiplicity.jsx',
-        '05_minesweeper.jsx',
-        '06_drones101.jsx',
-        '07_colors.jsx',
-        '08_intoTheWoods.jsx',
-        '09_fordingTheRiver.jsx',
-        '10_ambush.jsx',
-        '11_robot.jsx',
-        '12_robotNav.jsx',
-        '13_robotMaze.jsx',
-        '14_crispsContest.jsx',
-        '15_exceptionalCrossing.jsx',
-        '16_lasers.jsx',
-        '17_pointers.jsx',
-        '18_superDrEvalBros.jsx',
-        '19_documentObjectMadness.jsx',
-        '20_bossFight.jsx',
-        '21_endOfTheLine.jsx',
-        '22_credits.jsx'
+'01_cellBlockA.jsx','02_theLongWayOut.jsx','03_validationEngaged.jsx','04_multiplicity.jsx','05_minesweeper.jsx','06_drones101.jsx','07_colors.jsx','08_intoTheWoods.jsx','09_fordingTheRiver.jsx','10_ambush.jsx','11_robot.jsx','12_robotNav.jsx','13_robotMaze.jsx','14_crispsContest.jsx','15_exceptionalCrossing.jsx','16_lasers.jsx','17_pointers.jsx','18_superDrEvalBros.jsx','19_documentObjectMadness.jsx','20_bossFight.jsx','21_endOfTheLine.jsx','22_credits.jsx'
     ];
 
     this._bonusLevels = [
-        // 'sampleLevel.jsx',
-        'pushme.jsx',
-        'trapped.jsx'
-    ]
+'01_inTheDesert.jsx','02_theEmptyRoom.jsx','03_theCollapsingRoom.jsx','04_theGuard.jsx','_sampleLevel.jsx','ice.jsx','levelName.jsx','pushme.jsx','threeKeys.jsx','trapped.jsx','wallsWithEyes.jsx'
+    ].filter(function (lvl) { return (lvl.indexOf('_') != 0); }); // filter out bonus levels that start with '_'
+
+	this._mod = '';
 
     this._viewableScripts = [
         'codeEditor.js',
@@ -223,7 +219,7 @@ function Game(debugMode, startLevel) {
     this._resetTimeout = null;
     this._currentLevel = 0;
     this._currentFile = null;
-    this._levelReached = parseInt(localStorage.getItem('levelReached')) || 1;
+    this._levelReached = 1;
     this._displayedChapters = [];
 
     this._eval = window.eval; // store our own copy of eval so that we can override window.eval
@@ -233,6 +229,7 @@ function Game(debugMode, startLevel) {
 
     this._getHelpCommands = function () { return __commands; };
     this._isPlayerCodeRunning = function () { return __playerCodeRunning; };
+	this._getLocalKey = function (key) { return (this._mod.length == 0 ? '' : this._mod + '.') + key; };
 
     /* unexposed setters */
 
@@ -241,11 +238,15 @@ function Game(debugMode, startLevel) {
     /* unexposed methods */
 
     this._initialize = function () {
+        // Get last level reached from localStorage (if any)
+        var levelKey = this._mod.length == 0 ? 'levelReached' : this._mod + '.levelReached';
+        this._levelReached = parseInt(localStorage.getItem(levelKey)) || 1;
+
         // Fix potential corruption
         // levelReached may be "81111" instead of "8" due to bug
         if (this._levelReached > this._levelFileNames.length) {
             for (var l = 1; l <= this._levelFileNames.length; l++) {
-                if (!localStorage["level" + l + ".lastGoodState"]) {
+                if (!localStorage[this._getLocalKey("level" + l + ".lastGoodState")]) {
                     this._levelReached = l - 1;
                     break;
                 }
@@ -288,8 +289,8 @@ function Game(debugMode, startLevel) {
         this.setUpNotepad();
 
         // Load help commands from local storage (if possible)
-        if (localStorage.getItem('helpCommands')) {
-            __commands = localStorage.getItem('helpCommands').split(';');
+        if (localStorage.getItem(this._getLocalKey('helpCommands'))) {
+            __commands = localStorage.getItem(this._getLocalKey('helpCommands')).split(';');
         }
 
         // Enable debug features
@@ -298,11 +299,6 @@ function Game(debugMode, startLevel) {
             this._levelReached = 999; // make all levels accessible
             __commands = Object.keys(this.reference); // display all help
             this.sound.toggleSound(); // mute sound by default in debug mode
-        } else {
-            // some people are at work right now
-            if (document.referrer.indexOf('news.ycombinator.com') > -1) {
-                this.toggleSound();
-            }
         }
 
         // Lights, camera, action
@@ -366,7 +362,7 @@ function Game(debugMode, startLevel) {
 
         this._levelReached = Math.max(levelNum, this._levelReached);
         if (!debugMode) {
-            localStorage.setItem('levelReached', this._levelReached);
+            localStorage.setItem(this._getLocalKey('levelReached'), this._levelReached);
         }
 
         var fileName = this._levelFileNames[levelNum - 1];
@@ -412,7 +408,7 @@ function Game(debugMode, startLevel) {
 
         // store the commands introduced in this level (for api reference)
         __commands = __commands.concat(editor.getProperties().commandsIntroduced).unique();
-        localStorage.setItem('helpCommands', __commands.join(';'));
+        localStorage.setItem(this._getLocalKey('helpCommands'), __commands.join(';'));
     };
 
     this._getLevelByPath = function (filePath) {
@@ -433,7 +429,7 @@ function Game(debugMode, startLevel) {
 
             // store the commands introduced in this level (for api reference)
             __commands = __commands.concat(editor.getProperties().commandsIntroduced).unique();
-            localStorage.setItem('helpCommands', __commands.join(';'));
+            localStorage.setItem(this._getLocalKey('helpCommands'), __commands.join(';'));
         }, 'text');
 
     };
@@ -560,6 +556,11 @@ function Game(debugMode, startLevel) {
                 this.sound.playTrackByName(this.editor.getProperties().music);
             }
 
+            // activate super menu if 21_endOfTheLine has been reached
+            if (this._levelReached >= 21) {
+                this.activateSuperMenu();
+            }
+
             // finally, allow player movement
             if (this.map.getPlayer()) {
                 this.map.getPlayer()._canMove = true;
@@ -599,7 +600,7 @@ function CodeEditor(textAreaDomID, width, height, game) {
 
     var charLimit = 80;
 
-    var properties = {}
+    var properties = {};
     var editableLines = [];
     var editableSections = {};
     var lastChange = {};
@@ -1025,7 +1026,7 @@ function CodeEditor(textAreaDomID, width, height, game) {
 
     this.saveGoodState = function () {
         var lvlNum = game._currentFile ? game._currentFile : game._currentLevel;
-        localStorage.setItem('level' + lvlNum + '.lastGoodState', JSON.stringify({
+        localStorage.setItem(game._getLocalKey('level' + lvlNum + '.lastGoodState'), JSON.stringify({
             code: this.getCode(true),
             playerCode: this.getPlayerCode(),
             editableLines: editableLines,
@@ -1060,7 +1061,7 @@ function CodeEditor(textAreaDomID, width, height, game) {
     }
 
     this.getGoodState = function (lvlNum) {
-        return JSON.parse(localStorage.getItem('level' + lvlNum + '.lastGoodState'));
+        return JSON.parse(localStorage.getItem(game._getLocalKey('level' + lvlNum + '.lastGoodState')));
     }
 
     this.refresh = function () {
@@ -1074,7 +1075,7 @@ function CodeEditor(textAreaDomID, width, height, game) {
     this.initialize(); // run initialization code
 }
 ROT.Display.create = function(game, opts) {
-    opts['fontFamily'] = '"droid sans mono", Courier, "Courier New", monospace';
+    opts.fontFamily = '"droid sans mono", Courier, "Courier New", monospace';
     var display = new ROT.Display(opts);
     display.game = game;
     return display;
@@ -1230,22 +1231,7 @@ ROT.Display.prototype.saveGrid = function (map) {
 
 ROT.Display.prototype.playIntro = function (map, i) {
     display = this;
-
-    if (i < 0) {
-        this._intro = true;
-    } else {
-        if (typeof i === 'undefined') { i = map.getHeight(); }
-        this.clear();
-        this.drawText(0, i - 2, "%c{#0f0}> initialize")
-        this.drawText(15, i + 3, "U N T R U S T E D");
-        this.drawText(20, i + 5, "- or - ");
-        this.drawText(5, i + 7, "THE CONTINUING ADVENTURES OF DR. EVAL");
-        this.drawText(3, i + 12, "a game by Alex Nisnevich and Greg Shuflin");
-        this.drawText(10, i + 22, "Press any key to begin ...")
-        setTimeout(function () {
-            display.playIntro(map, i - 1);
-        }, 100);
-    }
+	playIntro(display, map, i)
 };
 
 ROT.Display.prototype.fadeIn = function (map, speed, callback, i) {
@@ -1354,6 +1340,8 @@ function DynamicObject(map, type, x, y, __game) {
     var __myTurn = true;
     var __timer = null;
 
+    this._map = map;
+
     /* wrapper */
 
     function wrapExposedMethod(f, object) {
@@ -1409,7 +1397,7 @@ function DynamicObject(map, type, x, y, __game) {
                     }
                 }
 
-                if (__myTurn && __definition.behavior !== null) {
+                if (__myTurn && __definition.behavior) {
                     map._validateCallback(function () {
                         __definition.behavior(me, player);
                     });
@@ -1449,10 +1437,19 @@ function DynamicObject(map, type, x, y, __game) {
 
         // try to pick up items
         var objectName = map._getGrid()[__x][__y].type;
-        if (map._getObjectDefinition(objectName).type === 'item' && !__definition.projectile) {
+        var object = map._getObjectDefinition(objectName);
+        if (object.type === 'item' && !__definition.projectile) {
             __inventory.push(objectName);
             map._removeItemFromMap(__x, __y, objectName);
             map._playSound('pickup');
+        } else if (object.type === 'trap') {
+            // this part is used by janosgyerik's bonus levels
+            if (object.deactivatedBy && object.deactivatedBy.indexOf(__type) > -1) {
+                if (typeof(object.onDeactivate) === 'function') {
+                    object.onDeactivate();
+                }
+                map._removeItemFromMap(__x, __y, objectName);
+            }
         }
     };
 
@@ -2388,6 +2385,68 @@ Objects can have the following parameters:
     type: 'item' or null
 */
 
+// used by bonus levels 01 through 04
+function moveToward(obj, type) {
+    var target = obj.findNearest(type);
+    var leftDist = obj.getX() - target.x;
+    var upDist = obj.getY() - target.y;
+
+    var direction;
+    if (upDist == 0 && leftDist == 0) {
+        return;
+    }
+    if (upDist > 0 && upDist >= leftDist) {
+        direction = 'up';
+    } else if (upDist < 0 && upDist < leftDist) {
+        direction = 'down';
+    } else if (leftDist > 0 && leftDist >= upDist) {
+        direction = 'left';
+    } else {
+        direction = 'right';
+    }
+
+    if (obj.canMove(direction)) {
+        obj.move(direction);
+    }
+}
+
+// used by bonus levels 01 through 04
+function followAndKeepDistance(obj, type) {
+    var target = obj.findNearest(type);
+    var leftDist = obj.getX() - target.x;
+    var upDist = obj.getY() - target.y;
+
+    if (Math.abs(upDist) < 2 && Math.abs(leftDist) < 4
+        || Math.abs(leftDist) < 2 && Math.abs(upDist) < 4) {
+        return;
+    }
+    var direction;
+    if (upDist > 0 && upDist >= leftDist) {
+        direction = 'up';
+    } else if (upDist < 0 && upDist < leftDist) {
+        direction = 'down';
+    } else if (leftDist > 0 && leftDist >= upDist) {
+        direction = 'left';
+    } else {
+        direction = 'right';
+    }
+
+    if (obj.canMove(direction)) {
+        obj.move(direction);
+    }
+}
+
+// used by bonus levels 01 through 04
+function killPlayerIfTooFar(obj) {
+    var target = obj.findNearest('player');
+    var leftDist = obj.getX() - target.x;
+    var upDist = obj.getY() - target.y;
+
+    if (Math.abs(upDist) > 8 || Math.abs(leftDist) > 8) {
+        obj._map.getPlayer().killedBy('"suspicious circumstances"');
+    }
+}
+
 Game.prototype.getListOfObjects = function () {
     var game = this;
     return {
@@ -2450,9 +2509,13 @@ Game.prototype.getListOfObjects = function () {
             'color': '#f0f',
             'onCollision': function (player, me) {
                 if (!player._hasTeleported) {
-                    game._callUnexposedMethod(function () {
-                        player._moveTo(me.target);
-                    });
+                    if (me.target) {
+                        game._callUnexposedMethod(function () {
+                            player._moveTo(me.target);
+                        });
+                    } else {
+                        throw 'TeleporterError: Missing target for teleporter'
+                    }
                 }
                 player._hasTeleported = true;
             },
@@ -2533,6 +2596,33 @@ Game.prototype.getListOfObjects = function () {
             'onDrop': function () {
                 game.map.writeStatus('You have lost the Algorithm!');
             }
+        },
+
+        // used by bonus levels 01 through 04
+        'eye': {
+            'type': 'dynamic',
+            'symbol': 'E',
+            'color': 'red',
+            'behavior': function (me) {
+                followAndKeepDistance(me, 'player');
+                killPlayerIfTooFar(me);
+            },
+            'onCollision': function (player) {
+                player.killedBy('"the eye"');
+            },
+        },
+
+        // used by bonus levels 01 through 04
+        'guard': {
+            'type': 'dynamic',
+            'symbol': 'd',
+            'color': 'red',
+            'behavior': function (me) {
+                moveToward(me, 'player');
+            },
+            'onCollision': function (player) {
+                player.killedBy('a guard drone');
+            },
         }
     };
 };
@@ -3011,12 +3101,6 @@ Game.prototype.reference = {
         'type': 'method',
         'description': 'Sets the background color of the given square.'
     },
-    'map.setSquareColor': {
-        'name': 'map.setSquareColor(x, y, color)',
-        'category': 'map',
-        'type': 'method',
-        'description': 'Sets the background color of the given square.'
-    },
     'map.startTimer': {
         'name': 'map.startTimer(callback, delay)',
         'category': 'map',
@@ -3057,7 +3141,13 @@ Game.prototype.reference = {
         'name': 'map.validateNoTimers()',
         'category': 'map',
         'type': 'method',
-        'description': 'Raises an exception if there are any timers currently set with map.startLevel.'
+        'description': 'Raises an exception if there are any timers currently set with map.startTimer.'
+    },
+    'map.writeStatus': {
+        'name': 'map.writeStatus(message)',
+        'category': 'map',
+        'type': 'method',
+        'description': 'Displays a message at the bottom of the map.'
     },
 
     'object.behavior': {
@@ -3928,7 +4018,7 @@ Game.prototype.setUpNotepad = function () {
     this.notepadEditor.setSize(null, 275);
 
     var ls_tag = 'notepadContent';
-    var content = localStorage.getItem(ls_tag);
+    var content = localStorage.getItem(this._getLocalKey(ls_tag));
     if (content === null) {
         content = '';
     }
@@ -3940,7 +4030,7 @@ Game.prototype.setUpNotepad = function () {
 
     $('#notepadSaveButton').click(function () {
         var v = game.notepadEditor.getValue();
-        localStorage.setItem(ls_tag, v);
+        localStorage.setItem(this._getLocalKey(ls_tag), v);
     });
 };
 
@@ -4114,7 +4204,7 @@ Game.prototype._levels = {
     'levels/16_lasers.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2.3",\n    "commandsIntroduced":\n        ["map.getCanvasContext", "canvas.beginPath", "canvas.strokeStyle",\n         "canvas.lineWidth", "canvas.moveTo", "canvas.lineTo",\n         "canvas.stroke", "map.createLine", "map.validateAtLeastXLines"],\n    "music": "Soixante-8",\n    "mapProperties": {\n        "showDrawingCanvas": true\n    }\n}\n#END_PROPERTIES#\n/*************\n * lasers.js *\n *************\n *\n * Time to unleash the killer lasers! Each laser will kill you\n * unless you have the appropriate color. Too bad you can\'t\n * see which color corresponds to which laser!\n */\n\nfunction getRandomInt(min, max) {\n    return Math.floor(Math.random() * (max - min + 1)) + min;\n}\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    map.placePlayer(0, 0);\n    map.placeObject(map.getWidth()-1, map.getHeight()-1, \'exit\');\n    var player = map.getPlayer();\n\n    for (var i = 0; i < 25; i++) {\n        var colors = [\'red\', \'yellow\', \'teal\'];\n\n        var startX = getRandomInt(0, 600);\n        var startY = getRandomInt(0, 500);\n        var angle = getRandomInt(0, 360);\n        var length = getRandomInt(200, 300);\n        var color = colors[i % 3];\n        createLaser(startX, startY, angle, length, color);\n    }\n\n    function createLaser(centerX, centerY, angleInDegrees, length, color) {\n        var angleInRadians = angleInDegrees * Math.PI / 180;\n\n        var x1 = centerX - Math.cos(angleInRadians) * length / 2;\n        var y1 = centerY + Math.sin(angleInRadians) * length / 2;\n        var x2 = centerX + Math.cos(angleInRadians) * length / 2;\n        var y2 = centerY - Math.sin(angleInRadians) * length / 2;\n\n        // map.createLine() creates a line with an effect when\n        // the player moves over it, but doesn\'t display it\n        map.createLine([x1, y1], [x2, y2], function (player) {\n            if (player.getColor() != color) {\n                player.killedBy(\'a \' + color + \' laser\');\n            }\n        });\n\n#BEGIN_EDITABLE#\n        // using canvas to draw the line\n        var ctx = map.getCanvasContext();\n        ctx.beginPath();\n        ctx.strokeStyle = \'white\';\n        ctx.lineWidth = 5;\n        ctx.moveTo(x1, y1);\n        ctx.lineTo(x2, y2);\n        ctx.stroke();\n#END_EDITABLE#\n\n    }\n\n#BEGIN_EDITABLE#\n\n\n\n\n\n\n\n\n\n#END_EDITABLE#\n#END_OF_START_LEVEL#\n}\n\nfunction validateLevel(map) {\n    map.validateExactlyXManyObjects(1, \'exit\');\n    map.validateAtLeastXLines(25);\n}\n 	', 
     'levels/17_pointers.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2.1",\n    "commandsIntroduced":\n        ["map.getDynamicObjects", "map.getCanvasCoords", "object.setTarget"],\n    "music": "Tart",\n    "mapProperties": {\n        "showDrawingCanvas": true\n    }\n}\n#END_PROPERTIES#\n/***************\n * pointers.js *\n ***************\n *\n * You! How are you still alive?\n *\n * Well, no matter. Good luck getting through this\n * maze of rooms - you\'ll never see me or the Algorithm again!\n */\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    function shuffle(o){ //v1.0 [http://bit.ly/1l6LGQT]\n        for(var j, x, i = o.length; i; j = Math.floor(Math.random() * i),\n            x = o[--i], o[i] = o[j], o[j] = x);\n        return o;\n    };\n\n    map.createFromGrid(\n        [\'+++++++++++++++++++++++++++++++++++++++++++++\',\n         \'++o *++++o *++++o *++++o *++++o *++++o *+++++\',\n         \'+* @ o++*   o++*   o++*   o++*   o++*   o++++\',\n         \'++o *++++o *++++o *++++o *++++o *++++o *+++++\',\n         \'+++++++++++++++++++++++++++++++++++++++++++++\',\n         \'+++++* o++++* o++++* o++++* o++++* o++++* o++\',\n         \'++++o   *++o   *++o   *++o   *++o   *++o   *+\',\n         \'+++++* o++++* o++++* o++++* o++++* o++++* o++\',\n         \'+++++++++++++++++++++++++++++++++++++++++++++\',\n         \'++o *++++o *++++o *++++o *++++o *++++o *+++++\',\n         \'+*   o++*   o++*   o++*   o++*   o++*   o++++\',\n         \'++o *++++o *++++o *++++o *++++o *++++o *+++++\',\n         \'+++++++++++++++++++++++++++++++++++++++++++++\',\n         \'+++++* o++++* o++++* o++++* o++++* o++++* o++\',\n         \'++++o   *++o   *++o   *++o   *++o   *++o   *+\',\n         \'+++++* o++++* o++++* o++++* o++++* o++++* o++\',\n         \'+++++++++++++++++++++++++++++++++++++++++++++\',\n         \'++o *++++o *++++o *++++o *++++o *++++o *+++++\',\n         \'+*   o++*   o++*   o++*   o++*   o++* E o++++\',\n         \'++o *++++o *++++o *++++o *++++o *++++o *+++++\',\n         \'+++++++++++++++++++++++++++++++++++++++++++++\'],\n        {\n            \'@\': \'player\',\n            \'E\': \'exit\',\n            \'+\': \'block\',\n            \'o\': \'teleporter\',\n            \'*\': \'trap\',\n        }, 2, 2);\n\n    var canvas = map.getCanvasContext();\n\n    var teleportersAndTraps = map.getDynamicObjects();\n    teleportersAndTraps = shuffle(teleportersAndTraps);\n\n    for (i = 0; i < teleportersAndTraps.length; i+=2) {\n        var t1 = teleportersAndTraps[i];\n        var t2 = teleportersAndTraps[i+1];\n\n        // Point each teleporter to either another teleporter\n        // or a trap\n        if (t1.getType() == \'teleporter\') {\n            t1.setTarget(t2);\n        }\n        if (t2.getType() == \'teleporter\') {\n            t2.setTarget(t1);\n        }\n\n#BEGIN_EDITABLE#\n        // TODO find a way to remove the API docs\n        // wouldn\'t want the \'good doctor\' to find\n        // out about map.getCanvasCoords()...\n\n\n\n\n\n#END_EDITABLE#\n    }\n#END_OF_START_LEVEL#\n}\n\nfunction validateLevel(map) {\n    map.validateExactlyXManyObjects(1, \'exit\');\n}\n 	', 
     'levels/18_superDrEvalBros.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2.2",\n    "commandsIntroduced": ["player.move", "map.startTimer"],\n    "music": "Beach Wedding Dance",\n    "mapProperties": {\n        "keyDelay": 25\n    }\n}\n#END_PROPERTIES#\n/**********************\n * superDrEvalBros.js *\n **********************\n *\n * You\'re still here?! Well, Dr. Eval, let\'s see\n * how well you can operate with one less dimension.\n *\n * Give up now. Unless you have a magic mushroom\n * up your sleeve, it\'s all over.\n */\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    var fl = Math.floor;\n    var w = map.getWidth();\n    var h = map.getHeight();\n\n    map.placePlayer(1, fl(h/2)-1);\n    var player = map.getPlayer();\n\n    map.placeObject(w-1, fl(h/2)-1, \'exit\');\n\n    for (var x = 0; x < fl(w/2) - 5; x++) {\n        for (var y = fl(h/2); y < h; y++) {\n            map.placeObject(x, y, \'block\');\n        }\n    }\n\n    for (var x = fl(w/2) + 5; x <= w; x++) {\n        for (var y = fl(h/2); y < h; y++) {\n            map.placeObject(x, y, \'block\');\n        }\n    }\n\n    function gravity() {\n        var x = player.getX();\n        var y = player.getY() + 1;\n\n        if (y === map.getHeight() - 2) {\n            player.killedBy("gravity");\n        }\n\n        if (map.getObjectTypeAt(x,y) === "empty") {\n            player.move("down");\n        }\n\n    }\n    map.startTimer(gravity, 45);\n\n    function jump() {\n#BEGIN_EDITABLE#\n\n\n\n\n\n\n\n#END_EDITABLE#\n    }\n\n    player.setPhoneCallback(function () {\n        var x = player.getX();\n        var y = player.getY() + 1;\n\n        if (map.getObjectTypeAt(x,y) !== "empty") {\n            jump();\n        }\n    });\n#END_OF_START_LEVEL#\n}\n\nfunction validateLevel(map) {\n    map.validateExactlyXManyObjects(1, \'exit\');\n    map.validateExactlyXManyObjects(520, \'block\');\n}\n 	', 
-    'levels/19_documentObjectMadness.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2.2",\n    "commandsIntroduced":\n        ["global.objective", "map.getDOM", "map.createFromDOM",\n         "map.updateDOM", "map.overrideKey", "global.$",\n         "jQuery.find", "jQuery.addClass", "jQuery.hasClass",\n         "jQuery.removeClass", "jQuery.parent", "jQuery.length",\n         "jQuery.children", "jQuery.first", "jQuery.next",\n         "jQuery.prev"],\n    "music": "BossLoop",\n    "mapProperties": {\n        "showDummyDom": true\n    }\n}\n#END_PROPERTIES#\n/****************************\n * documentObjectMadness.js *\n ****************************\n *\n * I can\'t believe it! I can\'t believe you made it onto\n * Department of Theoretical Computation\'s web server!\n * YOU SHOULD HAVE BEEN DELETED! This shouldn\'t even be\n * possible! What the hell were the IT folks thinking?\n *\n * No matter. I still have the Algorithm. That\'s the\n * important part. The rest is just implementation, and\n * how hard could that be?\n *\n * Anyway you\'re not going to catch me now, my good Doctor.\n * After all, you\'re a tenured professor with a well-respected\n * history of research - you probably don\'t know jQuery!\n */\n\nfunction objective(map) {\n    return map.getDOM().find(\'.adversary\').hasClass(\'drEval\');\n}\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    var html = "<div class=\'container\'>" +\n    "<div style=\'width: 600px; height: 500px; background-color: white; font-size: 10px;\'>" +\n        "<center><h1>Department of Theoretical Computation</h1></center>" +\n        "<hr />" +\n        "<table border=\'0\'><tr valign=\'top\'>" +\n            "<td><div id=\'face\' /></td>" +\n            "<td>" +\n                "<h2 class=facultyName>Cornelius Eval</h2>" +\n                "<h3>Associate Professor of Computer Science</h3>" +\n                "<ul>" +\n                    "<li>BS, Mathematics, University of Manitoba</li>" +\n                    "<li>PhD, Theoretical Computation, <a href=\'http://www.mit.edu\'>MIT</a></li>" +\n                "</ul>" +\n                "<h4>About me</h4>" +\n                "<p>I am an associate professor of computer science, attached to the Department of " +\n                "Theoretical Computation. My current research interests include the human-machine " +\n                "interface, NP complete problems, and parallelized mesh mathematics.</p>" +\n                "<p>I am also the current faculty advisor to the <a href=\'\'>undergraduate Super Smash Bros. team</a>. " +\n                "In my spare time I enjoy polka and dirtbiking. </p>" +\n            "</td>" +\n        "</tr></table>" +\n\n        "<div id=\'class_schedule\'>" +\n          "<h4>Class Schedule</h4>" +\n            "<table>" +\n             "<tr>" +\n                "<th>Monday</th><th>Tuesday</th><th>Wednesday</th><th>Thursday</th><th>Friday</th>" +\n             "</tr>" +\n             "<tr>" +\n                "<td>CS145 - Semicolons</td><td>Nothing Planned</td><td>CS145 - Semicolons</td><td>CS199 - Practical Theorycrafting </td><td>CS145 - Semicolons</td>" +\n             "</tr>" +\n            "</table>" +\n        "</div>" +\n        "<div id=\'loremIpsum\'>" +\n        "<h4>Lorem Ipsum</h4>" +\n          "<blockquote>" +\n            "<code>Neque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci " +\n            "velit, sed quia nonnumquam eiusmodi tempora incidunt ut labore et dolore magnam aliquam quaerat " +\n            "voluptatem.</code>" +\n            "<footer>— " +\n              "<cite>Cicero, De Finibus Bonorum et Malorum</cite>" +\n            "</footer>" +\n          "</blockquote>" +\n        "</div>" +\n    "</div></div>";\n\n    var $dom = $(html);\n\n    $dom.find(\'.facultyName\').addClass(\'drEval\');\n    $dom.find(\'cite\').addClass(\'adversary\');\n\n    function moveToParent(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.parent().length > 0 &&\n                !currentPosition.parent().hasClass(\'container\')) {\n            currentPosition.parent().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    function moveToFirstChild(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.children().length > 0) {\n            currentPosition.children().first().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    function moveToPreviousSibling(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.prev().length > 0) {\n            currentPosition.prev().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    function moveToNextSibling(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.next().length > 0) {\n            currentPosition.next().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    map.overrideKey(\'up\', function () { moveToParent(\'drEval\'); });\n    map.overrideKey(\'down\', function () { moveToFirstChild(\'drEval\'); });\n    map.overrideKey(\'left\', function () { moveToPreviousSibling(\'drEval\'); });\n    map.overrideKey(\'right\', function () { moveToNextSibling(\'drEval\'); });\n\n    map.defineObject(\'adversary\', {\n        \'type\': \'dynamic\',\n        \'symbol\': \'@\',\n        \'color\': \'red\',\n        \'behavior\': function (me) {\n            var move = Math.floor(Math.random() * 4) + 1; // 1, 2, 3, or 4\n            if (move == 1) {\n                moveToParent(\'adversary\');\n            } else if (move == 2) {\n                moveToFirstChild(\'adversary\');\n            } else if (move == 3) {\n                moveToPreviousSibling(\'adversary\');\n            } else if (move == 4) {\n                moveToNextSibling(\'adversary\');\n            }\n        }\n    });\n\n    map.placePlayer(1, 1);\n    map.placeObject(map.getWidth() - 2, map.getHeight() - 2, \'adversary\');\n\n    map.createFromDOM($dom);\n#END_OF_START_LEVEL#\n}\n 	', 
+    'levels/19_documentObjectMadness.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.3",\n    "commandsIntroduced":\n        ["global.objective", "map.getDOM", "map.createFromDOM",\n         "map.updateDOM", "map.overrideKey", "global.$",\n         "jQuery.find", "jQuery.addClass", "jQuery.hasClass",\n         "jQuery.removeClass", "jQuery.parent", "jQuery.length",\n         "jQuery.children", "jQuery.first", "jQuery.next",\n         "jQuery.prev"],\n    "music": "BossLoop",\n    "mapProperties": {\n        "showDummyDom": true\n    }\n}\n#END_PROPERTIES#\n/****************************\n * documentObjectMadness.js *\n ****************************\n *\n * I can\'t believe it! I can\'t believe you made it onto\n * Department of Theoretical Computation\'s web server!\n * YOU SHOULD HAVE BEEN DELETED! This shouldn\'t even be\n * possible! What the hell were the IT folks thinking?\n *\n * No matter. I still have the Algorithm. That\'s the\n * important part. The rest is just implementation, and\n * how hard could that be?\n *\n * Anyway you\'re not going to catch me now, my good Doctor.\n * After all, you\'re a tenured professor with a well-respected\n * history of research - you probably don\'t know jQuery!\n */\n\nfunction objective(map) {\n    return map.getDOM().find(\'.adversary\').hasClass(\'drEval\');\n}\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    var html = "<div class=\'container\'>" +\n    "<div style=\'width: 600px; height: 500px; background-color: white; font-size: 10px;\'>" +\n        "<center><h1>Department of Theoretical Computation</h1></center>" +\n        "<hr />" +\n        "<table border=\'0\'><tr valign=\'top\'>" +\n            "<td><div id=\'face\' /></td>" +\n            "<td>" +\n                "<h2 class=facultyName>Cornelius Eval</h2>" +\n                "<h3>Associate Professor of Computer Science</h3>" +\n                "<ul>" +\n                    "<li>BS, Mathematics, University of Manitoba</li>" +\n                    "<li>PhD, Theoretical Computation, <a href=\'http://www.mit.edu\'>MIT</a></li>" +\n                "</ul>" +\n                "<h4>About me</h4>" +\n                "<p>I am an associate professor of computer science, attached to the Department of " +\n                "Theoretical Computation. My current research interests include the human-machine " +\n                "interface, NP complete problems, and parallelized mesh mathematics.</p>" +\n                "<p>I am also the current faculty advisor to the <a href=\'\'>undergraduate Super Smash Bros. team</a>. " +\n                "In my spare time I enjoy polka and dirtbiking. </p>" +\n            "</td>" +\n        "</tr></table>" +\n\n        "<div id=\'class_schedule\'>" +\n          "<h4>Class Schedule</h4>" +\n            "<table>" +\n             "<tr>" +\n                "<th>Monday</th><th>Tuesday</th><th>Wednesday</th><th>Thursday</th><th>Friday</th>" +\n             "</tr>" +\n             "<tr>" +\n                "<td>CS145 - Semicolons</td><td>Nothing Planned</td><td>CS145 - Semicolons</td><td>CS199 - Practical Theorycrafting </td><td>CS145 - Semicolons</td>" +\n             "</tr>" +\n            "</table>" +\n        "</div>" +\n        "<div id=\'loremIpsum\'>" +\n        "<h4>Lorem Ipsum</h4>" +\n          "<blockquote>" +\n            "<code>Neque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci " +\n            "velit, sed quia nonnumquam eiusmodi tempora incidunt ut labore et dolore magnam aliquam quaerat " +\n            "voluptatem.</code>" +\n            "<footer>— " +\n              "<cite>Cicero, De Finibus Bonorum et Malorum</cite>" +\n            "</footer>" +\n          "</blockquote>" +\n        "</div>" +\n    "</div></div>";\n\n    var $dom = $(html);\n\n    $dom.find(\'.facultyName\').addClass(\'drEval\');\n    $dom.find(\'cite\').addClass(\'adversary\');\n\n    function moveToParent(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.parent().length > 0) {\n            if (currentPosition.parent().hasClass(\'container\')) {\n                map.getPlayer().killedBy(\'moving off the edge of the DOM\');\n            } else {\n                currentPosition.parent().addClass(className);\n                currentPosition.removeClass(className);\n                map.updateDOM($dom);\n            }\n        }\n    }\n\n    function moveToFirstChild(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.children().length > 0) {\n            currentPosition.children().first().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    function moveToPreviousSibling(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.prev().length > 0) {\n            currentPosition.prev().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    function moveToNextSibling(className) {\n        var currentPosition = $dom.find(\'.\' + className);\n        if (currentPosition.next().length > 0) {\n            currentPosition.next().addClass(className);\n            currentPosition.removeClass(className);\n            map.updateDOM($dom);\n        }\n    }\n\n    map.overrideKey(\'up\', function () { moveToParent(\'drEval\'); });\n    map.overrideKey(\'down\', function () { moveToFirstChild(\'drEval\'); });\n    map.overrideKey(\'left\', function () { moveToPreviousSibling(\'drEval\'); });\n    map.overrideKey(\'right\', function () { moveToNextSibling(\'drEval\'); });\n\n    map.defineObject(\'adversary\', {\n        \'type\': \'dynamic\',\n        \'symbol\': \'@\',\n        \'color\': \'red\',\n        \'behavior\': function (me) {\n            var move = Math.floor(Math.random() * 4) + 1; // 1, 2, 3, or 4\n            if (move == 1) {\n                moveToParent(\'adversary\');\n            } else if (move == 2) {\n                moveToFirstChild(\'adversary\');\n            } else if (move == 3) {\n                moveToPreviousSibling(\'adversary\');\n            } else if (move == 4) {\n                moveToNextSibling(\'adversary\');\n            }\n        }\n    });\n\n    map.placePlayer(1, 1);\n    map.placeObject(map.getWidth() - 2, map.getHeight() - 2, \'adversary\');\n\n    map.createFromDOM($dom);\n#END_OF_START_LEVEL#\n}\n 	', 
     'levels/20_bossFight.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2",\n    "commandsIntroduced":\n        ["object.onDestroy", "object.projectile",\n         "map.countObjects", "map.isStartOfLevel",\n         "map.validateAtMostXDynamicObjects", "map.validateNoTimers"],\n	"music": "Adversity",\n    "mapProperties": {\n        "refreshRate": 50,\n        "quickValidateCallback": true\n    }\n}\n#END_PROPERTIES#\n\n/*****************\n * bossFight.js *\n *****************\n *\n * NO FARTHER, DR. EVAL!!!!\n * YOU WILL NOT GET OUT OF HERE ALIVE!!!!\n * IT\'S TIME YOU SEE MY TRUE FORM!!!!\n * FACE MY ROBOT WRATH!!!!!\n */\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n	map.defineObject(\'boss\', {\n        \'type\': \'dynamic\',\n        \'symbol\': \'⊙\',\n        \'color\': \'red\',\n        \'interval\': 200,\n        \'onCollision\': function (player) {\n            player.killedBy(\'the boss\');\n        },\n        \'behavior\': function (me) {\n        	if (!me.direction) {\n        		me.direction = \'right\';\n        	}\n        	if (me.canMove(me.direction)) {\n            	me.move(me.direction);\n        	} else {\n        		me.direction = (me.direction == \'right\') ? \'left\' : \'right\';\n        	}\n        	if (Math.random() < 0.3) {\n            	map.placeObject(me.getX(), me.getY() + 2, \'bullet\');\n        	}\n        },\n        \'onDestroy\': function (me) {\n            if (map.countObjects(\'boss\') == 0) {\n                map.placeObject(me.getX(), me.getY(), \'theAlgorithm\');\n            }\n        }\n    });\n\n    map.defineObject(\'bullet\', {\n        \'type\': \'dynamic\',\n        \'symbol\': \'.\',\n        \'color\': \'red\',\n        \'interval\': 100,\n        \'projectile\': true,\n        \'behavior\': function (me) {\n            me.move(\'down\');\n        }\n    });\n\n    map.placePlayer(0, map.getHeight() - 3);\n    map.placeObject(map.getWidth() - 1, map.getHeight() - 1, \'exit\');\n\n    // Not so tough now, huh?\n    map.getPlayer().removeItem(\'phone\');\n    map.placeObject(map.getWidth() - 1, map.getHeight() - 3, \'phone\');\n\n    map.placeObject(0, map.getHeight() - 4, \'block\');\n    map.placeObject(1, map.getHeight() - 4, \'block\');\n    map.placeObject(2, map.getHeight() - 4, \'block\');\n    map.placeObject(2, map.getHeight() - 3, \'block\');\n    map.placeObject(map.getWidth() - 1, map.getHeight() - 4, \'block\');\n    map.placeObject(map.getWidth() - 2, map.getHeight() - 4, \'block\');\n    map.placeObject(map.getWidth() - 3, map.getHeight() - 4, \'block\');\n    map.placeObject(map.getWidth() - 3, map.getHeight() - 3, \'block\');\n\n    for (var x = 0; x < map.getWidth(); x++) {\n        map.placeObject(x, 4, \'block\');\n    }\n\n    map.placeObject(9, 5, \'boss\');\n    map.placeObject(11, 5, \'boss\');\n    map.placeObject(13, 5, \'boss\');\n    map.placeObject(15, 5, \'boss\');\n    map.placeObject(17, 5, \'boss\');\n    map.placeObject(19, 5, \'boss\');\n    map.placeObject(21, 5, \'boss\');\n    map.placeObject(23, 5, \'boss\');\n    map.placeObject(25, 5, \'boss\');\n    map.placeObject(27, 5, \'boss\');\n    map.placeObject(29, 5, \'boss\');\n    map.placeObject(31, 5, \'boss\');\n\n    map.placeObject(10, 6, \'boss\');\n    map.placeObject(12, 6, \'boss\');\n    map.placeObject(14, 6, \'boss\');\n    map.placeObject(16, 6, \'boss\');\n    map.placeObject(18, 6, \'boss\');\n    map.placeObject(20, 6, \'boss\');\n    map.placeObject(22, 6, \'boss\');\n    map.placeObject(24, 6, \'boss\');\n    map.placeObject(26, 6, \'boss\');\n    map.placeObject(28, 6, \'boss\');\n    map.placeObject(30, 6, \'boss\');\n\n#BEGIN_EDITABLE#\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n#END_EDITABLE#\n\n#END_OF_START_LEVEL#\n}\n\nfunction validateLevel(map) {\n    // called at start of level and whenever a callback executes\n    map.validateAtMostXObjects(59, \'block\');\n    map.validateAtMostXObjects(1, \'phone\');\n\n    if (map.countObjects(\'theAlgorithm\') > 0 && map.countObjects(\'boss\') > 0) {\n        throw "The Algorithm can only be dropped by the boss!";\n    }\n\n    // only called at start of level\n    if (map.isStartOfLevel()) {\n        map.validateAtMostXDynamicObjects(23);\n        map.validateNoTimers();\n    }\n}\n\nfunction onExit(map) {\n    if (!map.getPlayer().hasItem(\'theAlgorithm\')) {\n        map.writeStatus("You must take back the Algorithm!!");\n        return false;\n    } else if (!map.getPlayer().hasItem(\'phone\')) {\n        map.writeStatus("We need the phone!");\n        return false;\n    } else {\n        return true;\n    }\n}\n 	', 
     'levels/21_endOfTheLine.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2",\n    "activateSuperMenu": true,\n    "music": "Comme Des Orages"\n}\n#END_PROPERTIES#\n\n/*******************\n * endOfTheLine.js *\n *******************\n *\n * I don\'t feel guilty at all, Cornelius.\n *\n * Did you really expect me to? Did you really think that\n * you could be trusted with coauthorship on the paper that\n * would prove P = NP in the eyes of the world?\n *\n * You\'re a very pure researcher, my good Doctor. "Department\n * of Theoretical Computation", divorced from the realities\n * of the world. I don\'t think you ever considered the\n * implications - the *physical* implications - of the\n * Algorithm. What humanity might do if it was as easy to\n * solve an intractable puzzle as it was to conceive of it.\n *\n * We would become as unto Gods, Cornelius, if this knowledge\n * was public. Immature children wielding power unimaginable.\n * We\'ve already had one Oppenheimer - we don\'t need Dr.\n * Cornelius Eval to be another.\n *\n * If I had succeeded the Algorithm would be safe and secure\n * in the hands of those with the sound judgement and sense\n * of responsibility to use it wisely. I pray my failure\n * will not doom mankind - but I cannot hope so\n * optimistically.\n *\n * You may have defeated my robot form, but I anticipated\n * this eventuality. The Algorithm must never leave the\n * Machine Continuum. And so neither can you.\n *\n * This is bigger than me and bigger than you. I have no\n * regrets. I would do it again in an instant.\n */\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    map.finalLevel = true;\n    map.placePlayer(15, 12);\n    map.placeObject(25, 12, \'exit\');\n#END_OF_START_LEVEL#\n}\n 	', 
     'levels/22_credits.jsx': '#BEGIN_PROPERTIES#\n{\n    "version": "1.2.1",\n    "music": "Brazil"\n}\n#END_PROPERTIES#\n/**************\n * credits.js *\n *************\n *\n * Congratulations! Dr. Eval has successfully escaped from the\n * Machine Continuum with the Algorithm in hand.\n *\n * Give yourself a pat on the back. You are one clever hacker.\n *\n *\n *\n * Hungry for more?\n *\n * Check out Untrusted\'s github repository at\n *      https://github.com/AlexNisnevich/untrusted\n *\n * Perhaps try your hand at making your own level or two!\n *\n * Like what you\'ve been hearing? You can listen to the full\n * soundtrack at\n *      https://soundcloud.com/untrusted\n *\n * Feel free to drop us a line at [\n *      \'alex [dot] nisnevich [at] gmail [dot] com\',\n *      \'greg [dot] shuflin [at] gmail [dot] com\'\n * ]\n *\n * Once again, congratulations!\n *\n *             -- Alex and Greg\n */\n\nfunction startLevel(map) {\n#START_OF_START_LEVEL#\n    var credits = [\n        [15, 1, "U N T R U S T E D"],\n        [20, 2, "- or -"],\n        [5, 3, "THE CONTINUING ADVENTURES OF DR. EVAL"],\n        [1, 4, "{"],\n        [2, 5, "a_game_by: \'Alex Nisnevich and Greg Shuflin\',"],\n        [2, 7, "special_thanks_to: {"],\n        [5, 8, "Dmitry_Mazin: [\'design\', \'code\'],"],\n        [5, 9, "Jordan_Arnesen: [\'levels\', \'playtesting\'],"],\n        [5, 10, "Natasha_HullRichter: [\'levels\',\'playtesting\']"],\n        [2, 11, "},"],\n        [2, 13, "music_by: "],\n        [4, 14, "[\'Jonathan Holliday\',"],\n        [5, 15, "\'Dmitry Mazin\',"],\n        [5, 16, "\'Revolution Void\',"],\n        [5, 17, "\'Fex\',"],\n        [5, 18, "\'iNTRICATE\',"],\n        [5, 19, "\'Tortue Super Sonic\',"],\n        [5, 20, "\'Broke For Free\',"],\n        [5, 21, "\'Sycamore Drive\',"],\n        [5, 22, "\'Eric Skiff\'],"],\n        [30, 14, "\'Mike and Alan\',"],\n        [30, 15, "\'RoccoW\',"],\n        [30, 16, "\'That Andy Guy\',"],\n        [30, 17, "\'Obsibilo\',"],\n        [30, 18, "\'BLEO\',"],\n        [30, 19, "\'Rolemusic\',"],\n        [30, 20, "\'Seropard\',"],\n        [30, 21, "\'Vernon Lenoir\',"],\n        [15, map.getHeight() - 2, "Thank_you: \'for playing!\'"],\n        [1, map.getHeight() - 1, "}"]\n    ];\n\n    function drawCredits(i) {\n        if (i >= credits.length) {\n            return;\n        }\n\n        // redraw lines bottom to top to avoid cutting off letters\n        for (var j = i; j >= 0; j--) {\n            var line = credits[j];\n            map._display.drawText(line[0], line[1], line[2]);\n        }\n\n        map.timeout(function () {drawCredits(i+1);}, 2000)\n    }\n\n    map.timeout(function () {drawCredits(0);}, 4000);\n\n#END_OF_START_LEVEL#\n}\n 	', 
@@ -4137,4 +4227,4 @@ $(document).bind('keydown keyup', function(e) {
 })();
 
 console.log("%cIf you can read this, you are cheating! D:", "color: red; font-size: x-large");
-console.log("%cBut really, you don't need this console to play the game. Walk around using arrow keys (or Vim keys), and pick up the computer (" + String.fromCharCode(0x2318) + "). Then the fun begins!", "font-size: 15px")
+console.log("%cBut really, you don't need this console to play the game. Walk around using arrow keys (or Vim keys), and pick up the computer (" + String.fromCharCode(0x2318) + "). Then the fun begins!", "font-size: 15px");

@@ -1,3 +1,43 @@
+## joshua-s: jam their guns
+```javascript
+// Don't let boss emit bullets
+Math.random = function () {
+        return 1;
+}
+
+// Create good bullets
+map.defineObject('goodbullet', {
+        'type': 'dynamic',
+        'symbol': '.',
+        'color': 'blue',
+        'interval': 100,
+        'projectile': true,
+        'behavior': function (me) {
+                me.move('up');
+        }
+});
+
+// Fire!
+map.getPlayer().setPhoneCallback(function(){
+        for (var i = 0; i < map.getWidth(); i++) {
+                map.placeObject(i, 8, 'goodbullet');
+        }
+});
+```
+
+## mrtank: precise air strike
+
+```javascript
+    map.getPlayer().setPhoneCallback(function () {
+        var bosses = map.getDynamicObjects();
+        for (var i = 0; i < 23; i++) {
+            map.placeObject(bosses[i].getX(),
+                            bosses[i].getY() - 1,
+                            'bullet');
+        }
+    });
+```
+
 ## filippovdaniil: air strike
 
 ```javascript
@@ -50,7 +90,7 @@
     });
 
     map.overrideKey('left', function() {
-         
+
 	for(i=0;i<50;i++){
 	  map.placeObject(i, 20, 'bullet2');
       }
@@ -266,17 +306,17 @@ You just need to be sure to "call" whan you're close to the bullet proof glass
         'behavior': function (me) {
             me.move('up');
         }
-    });    
-   
+    });
+
     // A safe place on the way to the phone where you can wait until the boss goes to the other side
     map.placeObject(25, map.getHeight() - 4, 'block');
-	
+
     // Run bullets
     map.getPlayer().setPhoneCallback(function() {
         for (var i = 8; i < 18; i++) {
             for (var x = 0; x < map.getWidth(); x++) {
                 map.placeObject(x, i, 'myBullet');
-            }         
+            }
         }
     });
 ```
@@ -296,7 +336,7 @@ map.defineObject('mybullet', {
     		me.move('right');
 	}
 });
-    
+
 
 map.getPlayer().setPhoneCallback(function() {
 	map.placeObject(5, 5, 'mybullet');
@@ -358,9 +398,9 @@ But don't forget to generate `theAlgorithm` after all `boss` destroyed.
 
 Now you can get your phone and press `Q` until all bosses are destroyed and get `theAlgorithm` to next stage!
 
-## garzon: hide and shoot 
+## garzon: hide and shoot
 
-Don't panic! Just hide in the shelters and make phone calls. :) 
+Don't panic! Just hide in the shelters and make phone calls. :)
 
 ```javascript
     map.defineObject('bullet2', {
@@ -378,14 +418,138 @@ Don't panic! Just hide in the shelters and make phone calls. :)
         'color': 'green',
         'impassable':true
     });
-    
+
     for(x=Math.floor(map.getWidth()/2);x>0;x--){
     	map.placeObject(2*x,12,'shelter');
         map.placeObject(2*x-1,14,'shelter');
     }
-    
+
     map.getPlayer().setPhoneCallback(function(){
     	player=map.getPlayer();
         map.placeObject(player.getX()-1,player.getY(),'bullet2');
     });
+
+## MI53RE: I can use drone too! >:D
+
+	////////////////////////////////////////////////////////////////////////////////////
+	//WARNING WHEN THE BOSS IS KILLED YOU STILL MIGHT DIE FFROM YOUR DRONES'S BULLET!!//
+	//		  SO WATCH OUT WHEN GETTING THE ALGORYTHM!!			  //
+	//		            (Still IMAO it's fun :D)				  //
+	////////////////////////////////////////////////////////////////////////////////////
+
+```javascript
+
+
+
+	//we define a drone
+	map.defineObject('drone', {
+        'type': 'dynamic',
+        'symbol': '☣',
+        'color': 'yellow',
+        'interval': 200,
+        'behavior': function (me) {
+        		if (Math.random() < 0.3) {
+            			map.placeObject(me.getX() + 1, me.getY(), 'dbullet');
+        		}
+        	},
+    	});
+	 // we define the drone's weapon
+   	map.defineObject('dbullet', {
+        'type': 'dynamic',
+        'symbol': '.',
+        'color': 'blue',
+        'interval': 100,
+        'projectile': true,
+       	'behavior': function (me) {
+            		me.move('right');
+        	},
+        });
+	// we prepare the callback that will be activated later
+   	function callback(){
+		map.placeObject(1, 5, 'drone');
+    		map.placeObject(1, 6, 'drone');
+	}
+	//on level start we spawn a block that will help us
+	//get to the phone across the bullet's rain
+	map.placeObject(28, map.getHeight() - 5, 'block');
+	//once we get the phone back we can start the fun >:D!!!
+	map.getPlayer().setPhoneCallback(callback);
 ```
+
+## Innovision: Fight the Boss with a Boss
+
+```javascript
+map.defineObject('minishield', {
+        'symbol': '-',
+        'color': 'blue',
+        'impassable': true
+    });
+    
+    map.placeObject(25, 21, 'minishield');
+    
+   map.defineObject('ANTIboss', {
+        'type': 'dynamic',
+        'symbol': '⊙',
+        'color': 'green',
+        'interval': 200,
+        'onCollision': function (player) {
+            player.killedBy('the ANTIboss');
+        },
+        'behavior': function (me) {
+        	if (!me.direction) {
+        		me.direction = 'right';
+        	}
+        	if (me.canMove(me.direction)) {
+            	me.move(me.direction);
+        	} else {
+        		me.direction = (me.direction == 'right') ? 'left' : 'right';
+        	}
+        	if (Math.random() < 0.3) {
+            	map.placeObject(me.getX(), me.getY() - 2, 'ANTIbullet');
+        	}
+        }
+    });
+    
+    map.defineObject('ANTIbullet', {
+        'type': 'dynamic',
+        'symbol': '.',
+        'color': 'green',
+        'interval': 100,
+        'projectile': true,
+        'behavior': function (me) {
+            me.move('up');
+        }
+    });
+    
+    map.getPlayer().setPhoneCallback(function(){
+        map.placeObject(9, 5, 'boss');
+    map.placeObject(11, 13, 'ANTIboss');
+    map.placeObject(13, 13, 'ANTIboss');
+    map.placeObject(15, 13, 'ANTIboss');
+    map.placeObject(17, 13, 'ANTIboss');
+    map.placeObject(19, 13, 'ANTIboss');
+    map.placeObject(21, 13, 'ANTIboss');
+    map.placeObject(23, 13, 'ANTIboss');
+    map.placeObject(25, 13, 'ANTIboss');
+    map.placeObject(27, 13, 'ANTIboss');
+    map.placeObject(29, 13, 'ANTIboss');
+    map.placeObject(31, 13, 'ANTIboss');
+    
+    map.placeObject(10, 14, 'ANTIboss');
+    map.placeObject(12, 14, 'ANTIboss');
+    map.placeObject(14, 14, 'ANTIboss');
+    map.placeObject(16, 14, 'ANTIboss');
+    map.placeObject(18, 14, 'ANTIboss');
+    map.placeObject(20, 14, 'ANTIboss');
+    map.placeObject(22, 14, 'ANTIboss');
+    map.placeObject(24, 14, 'ANTIboss');
+    map.placeObject(26, 14, 'ANTIboss');
+    map.placeObject(28, 14, 'ANTIboss');
+    map.placeObject(30, 14, 'ANTIboss');
+    map.placeObject(32, 14, 'ANTIboss');
+    });
+```
+
+The whole idea behind this is that before you get the function phone, you hide under the minishield (see code) for cover.  Once you reach the other side and get the function phone, call it once.  A good version of the boss (named ANTIboss in the code) will appear.  It looks exactly the same as the boss, except that it is green in color and shoots upwards.  If the boss KOs the antiboss at the first call, simply call it again.  However, when the boss is defeated, you must still get the timing right, because the ANTIboss will still shoot upwards, and if you're not careful, you will die from its bullets.
+
+Thank you to those who have posted solutions before me.  Without your solutions, I would never have been able to understand the code and create this awesome solution.
